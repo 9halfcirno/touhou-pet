@@ -1,0 +1,7 @@
+{
+	"id": "spin",
+	"name": "旋转",
+	
+	"frame_num": 8,
+	"frame_interval": 25
+}

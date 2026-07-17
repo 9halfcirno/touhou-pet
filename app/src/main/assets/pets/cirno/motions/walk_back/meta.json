@@ -1,0 +1,6 @@
+{
+	"id": "walk_back",
+	"name": "后退",
+	"frame_num": 8,
+	"interval": 100
+}

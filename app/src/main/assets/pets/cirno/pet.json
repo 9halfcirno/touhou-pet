@@ -1,0 +1,21 @@
+{
+	"id": "cirno",
+	"uuid": "e8acc619-409d-41cd-bfd5-baeec1ee9210",
+	"name": "琪露诺",
+	"desc": "幻想乡的最强冰之妖精--琪露诺",
+	
+	"size": "40dp",
+	
+	"actions": {
+		"default": "idle",
+		"idle": "idle.js",
+		"circles": "circles.js"
+	},
+	
+	"motions": {
+		"idle": "idle",
+		"walk_front": "walk_front",
+		"circles": "circles",
+		"spin": "spin"
+	}
+}

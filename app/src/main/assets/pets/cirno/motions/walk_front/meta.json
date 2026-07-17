@@ -1,0 +1,8 @@
+{
+	"id": "walk_front",
+	"name": "前进",
+	
+	
+	"frame_num": 8,
+	"frame_interval": 100
+}

@@ -1,0 +1,7 @@
+{
+	"id": "idle",
+	"name": "空闲",
+	
+	"frame_num": 6,
+	"interval": 100
+}

@@ -1,0 +1,9 @@
+{
+	"id": "circles",
+	"name": "转圈圈",
+	
+	"frame_num": 15,
+	"interval": 150,
+	
+	"loop": false
+}
