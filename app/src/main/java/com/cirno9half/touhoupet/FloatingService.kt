@@ -11,6 +11,7 @@ import android.graphics.PixelFormat
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.view.Gravity
 import androidx.core.app.NotificationCompat
 import android.view.MotionEvent
 import android.view.View
@@ -30,7 +31,7 @@ class FloatingService : Service() {
         WindowManager.LayoutParams.TYPE_PHONE
     }
 
-    private val floatings = mutableMapOf<Int, ViewGroup>()
+    private val floatings = mutableMapOf<Int, View>()
     private val draggableMap = mutableMapOf<Int, Boolean>()
     private val dragLastPosMap = mutableMapOf<Int, Pair<Float, Float>>()
     private val draggingMap = mutableMapOf<Int, Boolean>()
@@ -104,14 +105,17 @@ class FloatingService : Service() {
         }
     }
 
-    fun create(view: ViewGroup, params: WindowManager.LayoutParams? = null): Int {
+    fun create(view: View, params: WindowManager.LayoutParams? = null): Int {
         val id = ++floatingIds
+        params?.apply {
+            params.gravity = Gravity.TOP or Gravity.START
+        }
         windowManager.addView(view, params ?: WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             LayoutType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT)
+            PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP or Gravity.START }
         )
         floatings[id] = view
         draggableMap[id] = true
@@ -122,7 +126,7 @@ class FloatingService : Service() {
     /**
      * 为悬浮窗设置拖动监听
      */
-    private fun setupDragListener(id: Int, view: ViewGroup) {
+    private fun setupDragListener(id: Int, view: View) {
         view.setOnTouchListener(fun(_: View, event: MotionEvent): Boolean {
             if (draggableMap[id] != true) return false
 
@@ -233,7 +237,7 @@ class FloatingService : Service() {
 
     // 将屏幕坐标限制在合理坐标内, x对应0~屏幕宽度-view.width, y对应状态栏~屏幕高 - view.height - 导航栏
     // 横屏时导航栏在侧边, 不限制y方向
-    fun fixPos(view: ViewGroup, x: Int, y: Int): Pair<Int, Int> {
+    fun fixPos(view: View, x: Int, y: Int): Pair<Int, Int> {
         val displayMetrics = resources.displayMetrics
         // 使用 WindowManager.LayoutParams 的尺寸(构造时固定的像素值),
         // 而非 view.width/height(测量值) —— onConfigurationChanged 时 view 尚未为新方向重新布局, 测量值为 0

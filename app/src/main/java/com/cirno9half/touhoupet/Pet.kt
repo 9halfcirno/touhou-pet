@@ -5,11 +5,10 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.FrameLayout
+import android.widget.TextView
 import org.json.JSONObject
 import kotlin.io.path.Path
 import kotlin.io.path.div
@@ -31,8 +30,6 @@ class Pet(var context: FloatingService?, val info: PetInfo) {
 
     val view: PetView = PetView(context!!)
 
-    private val viewGroup = FrameLayout(context!!)
-
     private var mainHandler: Handler? = Handler(Looper.getMainLooper())
 
 
@@ -40,11 +37,9 @@ class Pet(var context: FloatingService?, val info: PetInfo) {
     val action = ActionController(this)
 
     init {
-        viewGroup.addView(view) // 在ViewGroup中添加PetView
-        floating = context!!.create(viewGroup, floatingParams) // 创建悬浮窗并保存编号
-//        floating = context.create(viewGroup)
+//        viewGroup.addView(view) // 在ViewGroup中添加PetView
+        floating = context!!.create(view, floatingParams) // 创建悬浮窗并保存编号
         // 默认在屏幕中间
-        floatingParams.gravity = Gravity.TOP or Gravity.START
         floatingParams.apply {
             val dm = context!!.resources.displayMetrics
             x = (dm.widthPixels - width) / 2
@@ -55,6 +50,27 @@ class Pet(var context: FloatingService?, val info: PetInfo) {
             context?.update(it, floatingParams)
             context?.setDraggable(it, true)
         }
+
+        // 测试部分
+        val textView = TextView(context).apply {
+            text = "Test"
+        }
+        val params = WindowManager.LayoutParams(
+            cPx(info.size).toInt(), cPx(info.size).toInt(),
+            if (Build.VERSION.SDK_INT >= 26) 2038 else 2002,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT)
+        val textId = context!!.create(textView, params)
+        params.apply {
+            val dm = context!!.resources.displayMetrics
+            x = (dm.widthPixels - width) / 2
+            y = (dm.heightPixels - height) / 2
+        }
+        textId.let {
+            context?.update(textId, params)
+            context?.setDraggable(it, true)
+        }
+        // 测试部分
 
         // 获取数据存储路径, 优先尝试Extra路径
         val dir: String = context!!.getExternalFilesDir(null)?.path ?: context!!.filesDir.path
