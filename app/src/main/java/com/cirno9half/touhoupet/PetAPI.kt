@@ -12,8 +12,6 @@ class PetAPI(private val pet: Pet) {
     fun getDesc() = pet.info.desc
 //    fun getPetPath() = pet.info.path
 
-    fun getAlpha() = pet.alpha
-    fun setAlpha(a: Float) { pet.alpha = a }
     fun getWidth() = pet.view.width
     fun getHeight() = pet.view.height
     fun getSize() = pet.view.width to pet.view.height
@@ -29,8 +27,14 @@ class PetAPI(private val pet: Pet) {
         }
 
         quickjs.define("___tmpAPI") {
-            function("device_getWidth") { pet.context?.resources?.displayMetrics?.widthPixels ?: 0 }
-            function("device_getHeight") { pet.context?.resources?.displayMetrics?.heightPixels ?: 0}
+            function("device_getWidth") {
+                val ctx = pet.context ?: return@function 0
+                ctx.resources.displayMetrics.widthPixels
+            }
+            function("device_getHeight") {
+                val ctx = pet.context ?: return@function 0
+                ctx.resources.displayMetrics.heightPixels
+            }
 
             function("animation_switchTo") { args -> pet.animation.switchTo(args[0] as String) }
             function("animation_pause") { pet.animation.paused = true }
@@ -42,28 +46,44 @@ class PetAPI(private val pet: Pet) {
             function("getDesc") { getDesc() }
 //            function("getPath") { getPetPath() }
 
-            function("getX") { pet.x }
+            function("getX") { pet.floatingParams.x }
             function("setX") { args ->
-                pet.x = (args[0] as Number).toInt()
+                pet.floatingParams.x = (args[0] as Number).toInt()
+                pet.floatingParamsDirty = true
             }
-            function("getY") { pet.y }
+            function("getY") { pet.floatingParams.y }
             function("setY") { args ->
-                pet.y = (args[0] as Number).toInt()
+                pet.floatingParams.y = (args[0] as Number).toInt()
+                pet.floatingParamsDirty = true
             }
-            function("setPos") { args -> pet.pos = Pair((args[0] as Number).toInt(), (args[1] as Number).toInt()) }
-
+            function("setPos") { args ->
+                pet.floatingParams.x = (args[0] as Number).toInt()
+                pet.floatingParams.y = (args[1] as Number).toInt()
+                pet.floatingParamsDirty = true
+            }
             function("state_getDragging") {
                 return@function pet.isDragging()
             }
 
-            function("view_getAlpha") { getAlpha() }
+            function("view_getAlpha") {
+                return@function pet.floatingParams.alpha
+            }
             function("view_setAlpha") { args ->
-                setAlpha((args[0] as Number).toFloat())
+                pet.floatingParams.alpha = (args[0] as Number).toFloat()
                 pet.floatingParamsDirty = true
             }
             function("view_getWidth") { getWidth() }
             function("view_getHeight") { getHeight() }
             function("view_getSize") { getSize() }
+            function("view_scale_getX") { pet.view.scaleX }
+            function("view_scale_setX") { args ->
+                pet.inMain { pet.view.scaleX = (args[0] as Number).toFloat() }
+
+            }
+            function("view_scale_getY") { pet.view.scaleY }
+            function("view_scale_setY") { args ->
+                pet.inMain { pet.view.scaleY = (args[0] as Number).toFloat() }
+            }
 
             function("data_set") { args ->
                 val k = args[0]
@@ -98,8 +118,8 @@ class PetAPI(private val pet: Pet) {
                 val viewW = pet.view.width
                 val viewH = pet.view.height
 
-                val px = pet.x
-                val py = pet.y
+                val px = pet.floatingParams.x
+                val py = pet.floatingParams.y
 
                 // 本地坐标系, 与 FloatingService.fixPos 一致:
                 //   竖屏: y下边界 = screenH - navH - statusH
@@ -141,8 +161,8 @@ class PetAPI(private val pet: Pet) {
                 
                 
                 globalThis.device = {
-                    get width() { device_getWidth() },
-                    get height() { device_getHeight() }
+                    get width() { return bridge.device_getWidth() || 0 },
+                    get height() { return bridge.device_getHeight() || 0}
                 };
                 
                 // 在局部用闭包安全的绑定属性
@@ -157,6 +177,7 @@ class PetAPI(private val pet: Pet) {
                     set y(v) { bridge.setY(v); },
                     
                     move(x = 0, y = 0) { bridge.setPos(this.x + x, this.y + y); }, 
+                    setPosition(x, y) { bridge.setPos(x, y) },
                                        
                     animation: {
                         switchTo(id) { 
@@ -189,14 +210,20 @@ class PetAPI(private val pet: Pet) {
                         touchEdge() { return bridge.sensor_touchEdge() }
                     },
                     state: {
-                        get dragging() { bridge.state_getDragging() }
+                        get dragging() { return bridge.state_getDragging() }
                     },
                     
                     view: {
                         get alpha() { return bridge.view_getAlpha() },
                         set alpha(v) { return bridge.view_setAlpha(v) },
                         get width() { return bridge.view_getWidth() },
-                        get height() { return bridge.view_getHeight() }
+                        get height() { return bridge.view_getHeight() },
+                        scale: {
+                            get x() { return bridge.view_scale_getX() },
+                            get y() { return bridge.view_scale_getY() },
+                            set x(v) { bridge.view_scale_setX(v) },
+                            set y(v) { bridge.view_scale_setY(v) }
+                        }
                     },
                     data: {
                         get(k, c) { return bridge.data_get(k, c) },

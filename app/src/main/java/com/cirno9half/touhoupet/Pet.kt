@@ -9,6 +9,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.TextView
+import com.cirno9half.touhoupet.component.DialogBubble
+import kotlinx.coroutines.Runnable
 import org.json.JSONObject
 import kotlin.io.path.Path
 import kotlin.io.path.div
@@ -36,8 +38,12 @@ class Pet(var context: FloatingService?, val info: PetInfo) {
     val animation = AnimationController(this)
     val action = ActionController(this)
 
+    inner class Component() {
+        val dialog = DialogBubble(this@Pet)
+    }
+    val component = Component()
+
     init {
-//        viewGroup.addView(view) // 在ViewGroup中添加PetView
         floating = context!!.create(view, floatingParams) // 创建悬浮窗并保存编号
         // 默认在屏幕中间
         floatingParams.apply {
@@ -51,31 +57,12 @@ class Pet(var context: FloatingService?, val info: PetInfo) {
             context?.setDraggable(it, true)
         }
 
-        // 测试部分
-        val textView = TextView(context).apply {
-            text = "Test"
-        }
-        val params = WindowManager.LayoutParams(
-            cPx(info.size).toInt(), cPx(info.size).toInt(),
-            if (Build.VERSION.SDK_INT >= 26) 2038 else 2002,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT)
-        val textId = context!!.create(textView, params)
-        params.apply {
-            val dm = context!!.resources.displayMetrics
-            x = (dm.widthPixels - width) / 2
-            y = (dm.heightPixels - height) / 2
-        }
-        textId.let {
-            context?.update(textId, params)
-            context?.setDraggable(it, true)
-        }
-        // 测试部分
-
         // 获取数据存储路径, 优先尝试Extra路径
         val dir: String = context!!.getExternalFilesDir(null)?.path ?: context!!.filesDir.path
         val dataPath = Path(dir) / "data" / "pets"  / info.uuid / "data.json"
         data = DataManager(dataPath.toString())
+
+        component.dialog.show()
     }
 
     fun show() {
@@ -113,57 +100,21 @@ class Pet(var context: FloatingService?, val info: PetInfo) {
         if (!floatingParamsDirty) return
         // 向主线程发送ui更新
         mainHandler?.post {
+            component.dialog.apply {
+                updatePosition()
+            }
             context?.update(floating, floatingParams)
         }
         floatingParamsDirty = false
     }
 
-    // x, y, alpha获取方法
-    var x: Int
-        get() = floatingParams.x
-        set(v) {
-            floatingParams.x = v
-            floatingParamsDirty = true
-            updateParams()
-        }
-    var y: Int
-        get() = floatingParams.y
-        set(v) {
-            floatingParams.y = v
-            floatingParamsDirty = true
-            updateParams()
-        }
-    var pos: Pair<Int, Int>
-        get() = Pair(x, y)
-        set(value) {
-            floatingParams.x = value.first
-            floatingParams.y = value.second
-            floatingParamsDirty = true
-            updateParams()
-        }
-    var alpha: Float
-        get() = floatingParams.alpha
-        set(v) {
-            floatingParams.alpha = v
-            floatingParamsDirty = true
-            updateParams()
-        }
-    var size: String
-        get() = info.size
-        set(v) {
-            info.size = v
-            val px = cPx(v).toInt()
-            floatingParams.width = px
-            floatingParams.height = px
-            floatingParamsDirty = true
-            updateParams()
-        }
+    fun inMain(block: Runnable) {
+        mainHandler?.post(block)
+    }
 
     fun isDragging(): Boolean {
         return context?.isDragging(floating) ?: false
     }
-
-
 
     fun dispose() {
         context?.destroy(floating)
