@@ -107,16 +107,18 @@ class FloatingService : Service() {
 
     fun create(view: View, params: WindowManager.LayoutParams? = null): Int {
         val id = ++floatingIds
-        params?.apply {
-            params.gravity = Gravity.TOP or Gravity.START
-        }
-        windowManager.addView(view, params ?: WindowManager.LayoutParams(
+        // 不论传不传 params，都强制使用服务自己的 LayoutType 和 gravity
+        val finalParams = (params ?: WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             LayoutType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP or Gravity.START }
-        )
+            PixelFormat.TRANSLUCENT
+        )).also {
+            it.gravity = Gravity.TOP or Gravity.START
+            it.type = LayoutType
+        }
+        windowManager.addView(view, finalParams)
         floatings[id] = view
         draggableMap[id] = true
         setupDragListener(id, view)
