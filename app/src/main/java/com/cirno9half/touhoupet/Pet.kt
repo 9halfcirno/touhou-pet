@@ -1,5 +1,6 @@
 package com.cirno9half.touhoupet
 
+import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -56,9 +57,7 @@ class Pet(var context: FloatingService?, val info: PetInfo) {
         }
 
         // 获取数据存储路径, 优先尝试Extra路径
-        val dir: String = context!!.getExternalFilesDir(null)?.path ?: context!!.filesDir.path
-        val dataPath = Path(dir) / "data" / "pets"  / info.uuid / "data.json"
-        data = DataManager(dataPath.toString())
+        data = DataManager(info.dataPath(context!!))
 
         context?.onDrag(floating) { state ->
             component.dialog.updatePosition()
@@ -117,15 +116,23 @@ class Pet(var context: FloatingService?, val info: PetInfo) {
         return context?.isDragging(floating) ?: false
     }
 
+    /**
+     * 销毁 Pet 并释放资源。
+     *
+     * 必须在主线程调用: DialogBubble.hidden() 内部通过 Handler 回到主线程,
+     * 且它在主线程时是直接执行, 这样才能在 context 被置空前拿到 service 去销毁对话框悬浮窗。
+     */
     fun dispose() {
         context?.destroy(floating)
+        // 组件销毁/隐藏, 必须在 context 置空前调用, 否则对话框悬浮窗不会被销毁
+        component.dialog.hidden()
+        (view.parent as? ViewGroup)?.removeView(view)
         context = null
+        view.dispose()
+
         animation.dispose()
         action.dispose()
         data.dispose()
-        // 组件销毁/隐藏
-        component.dialog.hidden()
-        (view.parent as? ViewGroup)?.removeView(view)
     }
 }
 
@@ -144,4 +151,14 @@ class PetInfo(// pet加载字段
     var actions: JSONObject = info.optJSONObject("actions") ?: JSONObject()
     var defaultAction: String = actions.getString("default")
 
+    /**
+     * 该 Pet 的 data.json 存储路径, 优先外部存储。
+     *
+     * 不构造 Pet 实例也能定位数据文件(例如 PetManager 读取 enable 记录),
+     * 与 [Pet] 构造时使用的路径保持一致。
+     */
+    fun dataPath(context: Context): String {
+        val dir: String = context.getExternalFilesDir(null)?.path ?: context.filesDir.path
+        return (Path(dir) / "data" / "pets" / uuid / "data.json").toString()
+    }
 }

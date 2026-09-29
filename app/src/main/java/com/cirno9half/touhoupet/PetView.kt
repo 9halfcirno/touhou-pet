@@ -69,7 +69,7 @@ class PetView(
         canvas.drawBitmap(bmp, srcRect, dstRect, paint)
     }
 
-    fun onDestroy() {
+    fun dispose() {
         bitmap = null
         cache.snapshot().values.forEach { bmp ->
             if (bmp != null && !bmp.isRecycled) {
