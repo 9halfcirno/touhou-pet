@@ -114,24 +114,24 @@ class PetAPI(private val pet: Pet) {
                 val k = args[0]
                 if (k !is String) return@function false // 设置失败返回false
                 val v = args[1]
-                pet.data.set(k, v)
+                pet.data.set("action.$k", v)
                 pet.data.save()
             }
             function("data_get") { args ->
                 val k = args[0]
                 if (k !is String) return@function false
                 val fb = args[1]
-                return@function pet.data.get(k, fb)
+                return@function pet.data.get("action.$k", fb)
             }
             function("data_has") { args ->
                 val k = args[0]
                 if (k !is String) return@function false
-                return@function pet.data.has(k)
+                return@function pet.data.has("action.$k")
             }
             function("data_delete") { args ->
                 val k = args[0]
                 if (k !is String) return@function false
-                return@function pet.data.delete(k)
+                return@function pet.data.delete("action.$k")
             }
 
             // pet传感器相关
