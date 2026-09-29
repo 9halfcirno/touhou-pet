@@ -1,6 +1,7 @@
 package com.cirno9half.touhoupet.ui
 
 import android.graphics.BitmapFactory
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -29,7 +30,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cirno9half.touhoupet.R
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.*
 import androidx.compose.ui.draw.clip
@@ -53,7 +53,8 @@ fun PetManagementScreen(
     onButton1Click: () -> Unit = {},
     onButton2Click: () -> Unit = {},
     onUploadClick: () -> Unit = {},
-    onPetToggle: (PetInfo, Boolean) -> Unit = { _, _ -> }
+    // 返回是否切换成功, 失败时开关保持原状态
+    onPetToggle: (PetInfo, Boolean) -> Boolean = { _, _ -> true }
 ) {
     val pets = remember { PetManager }
 
@@ -140,6 +141,8 @@ fun PetManagementScreen(
                     val pet = pets.petList.getValue(id)
                     PetCard(
                         pet = pet,
+                        // 开关状态派生自“该 Pet 是否在运行中”, start/stop 修改 pets 后自动重组
+                        enabled = PetManager.pets.containsKey(id),
                         onToggle = { checked -> onPetToggle(pet, checked) }
                     )
                 }
@@ -205,10 +208,10 @@ fun PetManagementScreen(
 @Composable
 fun PetCard(
     pet: PetInfo,
-    onToggle: (Boolean) -> Unit
+    enabled: Boolean,
+    onToggle: (Boolean) -> Boolean
 ) {
-//    var checkedState by remember { mutableStateOf(pet.isEnabled) }
-    var checkedState = true
+    val context = LocalContext.current
     // 浅色卡片 + 边框，去除阴影
     Card(
         modifier = Modifier
@@ -248,24 +251,26 @@ fun PetCard(
             }
 
             LoadingSwitch(
-                checked = checkedState,
-                onCheckedChange = { newState ->
-                    checkedState = newState
-                    onToggle(newState)
-                },
+                checked = enabled,
                 loadAction = { newValue ->
-                    // 模拟耗时操作，例如保存到服务器
-                    delay(2000)
+                    if (!onToggle(newValue)) {
+                        Toast.makeText(context, "切换桌宠状态失败", Toast.LENGTH_SHORT).show()
+                    }
                 }
             )
         }
     }
 }
 
+/**
+ * 带加载中的开关。
+ *
+ * [checked] 完全由外部状态决定(这里是 PetManager.pets), 因此 [loadAction] 失败时
+ * 外部状态不变, 开关会自然保持原位, 不需要组件自己做回滚。
+ */
 @Composable
 fun LoadingSwitch(
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
     loadAction: suspend (Boolean) -> Unit // 异步任务
 ) {
     var isLoading by remember { mutableStateOf(false) }
@@ -279,9 +284,6 @@ fun LoadingSwitch(
                     isLoading = true
                     try {
                         loadAction(newValue)      // 执行耗时操作
-                        onCheckedChange(newValue) // 成功才真正切换状态
-                    } catch (e: Exception) {
-                        // 失败不改变状态
                     } finally {
                         isLoading = false
                     }

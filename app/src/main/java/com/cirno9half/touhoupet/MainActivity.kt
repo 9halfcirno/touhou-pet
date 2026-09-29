@@ -14,19 +14,12 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.net.toUri
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
-import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import com.cirno9half.touhoupet.ui.PetManagementScreen
-import kotlinx.coroutines.android.HandlerDispatcher
 import kotlin.system.exitProcess
 
 class MainActivity : ComponentActivity() {
 
     private var isBound = false
-    private var pet: Pet? = null;
 
     private val connection = object : ServiceConnection {
         var floatingService: FloatingService? = null
@@ -36,34 +29,10 @@ class MainActivity : ComponentActivity() {
             this.floatingService = floatingService
             isBound = true
 
+            // 把服务交给 PetManager: 由它加载 Pet 列表, 并恢复上次处于启用状态的 Pet
+            PetManager.attach(floatingService)
             PetManager.loadPetList(floatingService)
-
-            // 如果你的 Pet 构造函数需要 Context 来创建 View，可以直接把服务传过去（因为 Service 本身就是 Context）
-            // 读取pet.json
-            val assetPath = "pets/cirno"
-
-            val stream = this@MainActivity.assets.open("$assetPath/pet.json")
-            val reader = BufferedReader(InputStreamReader(stream))
-            val json = JSONObject(reader.use { it.readText() })
-            val cirno = Pet(
-                floatingService,
-                PetInfo("pets/cirno", true, json)
-            )
-            pet = cirno
-            lifecycleScope.launch {
-                cirno.loadResource()
-
-                cirno.show()
-
-                cirno.animation.switchTo("idle")
-                cirno.animation.startLoop()
-
-                cirno.action.loadAPI()
-
-                cirno.action.switchTo("idle")
-                cirno.action.startLoop()
-            }
-
+            PetManager.restoreEnabled()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -99,6 +68,9 @@ class MainActivity : ComponentActivity() {
             PetManagementScreen(
                 onCloseAllClick = {
                     exit() // 退出
+                },
+                onPetToggle = { info, checked ->
+                    if (checked) PetManager.start(info.id) else PetManager.stop(info.id)
                 }
             )
         }
@@ -126,8 +98,7 @@ class MainActivity : ComponentActivity() {
     }
 
     fun exit() {
-        pet?.dispose()
-        pet = null
+        PetManager.disposeAll()
         val intent = Intent(this, FloatingService::class.java)
         stopService(intent)
         finishAffinity()
