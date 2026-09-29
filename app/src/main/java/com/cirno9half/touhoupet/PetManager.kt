@@ -2,6 +2,7 @@ package com.cirno9half.touhoupet
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.runtime.mutableStateMapOf
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -9,7 +10,9 @@ import kotlin.io.path.Path
 import kotlin.io.path.div
 
 object PetManager {
-    val petList = mutableMapOf<String, PetInfo>()
+    // 必须是 Compose 可观察集合：loadPetList 在 ServiceConnection 回调里异步写入，
+    // 普通 MutableMap 不会触发重组，会导致首次启动时列表停在空快照上。
+    val petList = mutableStateMapOf<String, PetInfo>()
     private var assetPet = emptyArray<String>()
     private var externalPet = emptyArray<String>()
 

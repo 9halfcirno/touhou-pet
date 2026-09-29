@@ -136,7 +136,8 @@ fun PetManagementScreen(
                     .fillMaxSize()
                     .padding(start = 8.dp, end = 8.dp, top = 8.dp)
             ) {
-                items(pets.petList.values.toList()) { pet ->
+                items(pets.petList.keys.toList()) { id ->
+                    val pet = pets.petList.getValue(id)
                     PetCard(
                         pet = pet,
                         onToggle = { checked -> onPetToggle(pet, checked) }
