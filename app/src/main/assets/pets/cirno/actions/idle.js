@@ -1,5 +1,5 @@
 const actions = [
-//	"walk",
+	"walk",
 	"circles"
 ]
 
@@ -14,8 +14,9 @@ export default {
 
 	update(pet) {
 		if (Date.now() - this.startTime > this.during) {
-			pet.action.switchTo("circles")
-//			pet.action.switchTo(actions[Math.floor(Math.random() * actions.length)])
+//			pet.action.switchTo("circles")
+			pet.dialog.hidden();
+			pet.action.switchTo(actions[Math.floor(Math.random() * actions.length)])
 		}
 	}
 }

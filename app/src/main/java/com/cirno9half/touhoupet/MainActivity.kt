@@ -26,6 +26,7 @@ import kotlin.system.exitProcess
 class MainActivity : ComponentActivity() {
 
     private var isBound = false
+    private var pet: Pet? = null;
 
     private val connection = object : ServiceConnection {
         var floatingService: FloatingService? = null
@@ -48,6 +49,7 @@ class MainActivity : ComponentActivity() {
                 floatingService,
                 PetInfo("pets/cirno", true, json)
             )
+            pet = cirno
             lifecycleScope.launch {
                 cirno.loadResource()
 
@@ -124,6 +126,8 @@ class MainActivity : ComponentActivity() {
     }
 
     fun exit() {
+        pet?.dispose()
+        pet = null
         val intent = Intent(this, FloatingService::class.java)
         stopService(intent)
         finishAffinity()

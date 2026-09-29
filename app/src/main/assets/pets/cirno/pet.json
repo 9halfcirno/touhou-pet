@@ -9,7 +9,8 @@
 	"actions": {
 		"default": "idle",
 		"idle": "idle.js",
-		"circles": "circles.js"
+		"circles": "circles.js",
+		"walk": "walk.js"
 	},
 	
 	"motions": {
