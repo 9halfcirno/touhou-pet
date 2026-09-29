@@ -1,6 +1,5 @@
 package com.cirno9half.touhoupet
 
-import android.content.res.Resources
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -8,7 +7,6 @@ import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.TextView
 import com.cirno9half.touhoupet.component.DialogBubble
 import kotlinx.coroutines.Runnable
 import org.json.JSONObject
@@ -25,7 +23,7 @@ class Pet(var context: FloatingService?, val info: PetInfo) {
     var data: DataManager
     var floating: Int
     var floatingParams = WindowManager.LayoutParams(
-        cPx(info.size).toInt(), cPx(info.size).toInt(),
+        dp2px(info.size).toInt(), dp2px(info.size).toInt(),
         if (Build.VERSION.SDK_INT >= 26) 2038 else 2002,
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
         PixelFormat.TRANSLUCENT)
@@ -62,7 +60,9 @@ class Pet(var context: FloatingService?, val info: PetInfo) {
         val dataPath = Path(dir) / "data" / "pets"  / info.uuid / "data.json"
         data = DataManager(dataPath.toString())
 
-        component.dialog.show()
+        context?.onDrag(floating) { state ->
+            component.dialog.updatePosition()
+        }
     }
 
     fun show() {
@@ -100,6 +100,7 @@ class Pet(var context: FloatingService?, val info: PetInfo) {
         if (!floatingParamsDirty) return
         // 向主线程发送ui更新
         mainHandler?.post {
+//            component.dialog.setContent("x: ${floatingParams.x}, y: ${floatingParams.y}")
             component.dialog.apply {
                 updatePosition()
             }
@@ -122,6 +123,8 @@ class Pet(var context: FloatingService?, val info: PetInfo) {
         animation.dispose()
         action.dispose()
         data.dispose()
+        // 组件销毁/隐藏
+        component.dialog.hidden()
         (view.parent as? ViewGroup)?.removeView(view)
     }
 }
@@ -142,17 +145,3 @@ class PetInfo(// pet加载字段
     var defaultAction: String = actions.getString("default")
 
 }
-
-fun cPx(size: String): Number {
-    val reg = Regex("""(\d+)([a-z]+)""")
-    val match = reg.find(size) ?: return 0
-    val (valueStr, unit) = match.destructured
-    val value = valueStr.toFloat()
-    return when (unit) {
-        "dp", "dip" -> value * Resources.getSystem().displayMetrics.density
-        "sp" -> value * Resources.getSystem().displayMetrics.scaledDensity
-        "px" -> value
-        else -> value
-    }
-}
-

@@ -15,8 +15,9 @@ import android.view.Gravity
 import androidx.core.app.NotificationCompat
 import android.view.MotionEvent
 import android.view.View
-import android.view.ViewGroup
+import android.view.ViewConfiguration
 import android.view.WindowManager
+import kotlin.math.sqrt
 
 class FloatingService : Service() {
     companion object {
@@ -35,6 +36,9 @@ class FloatingService : Service() {
     private val draggableMap = mutableMapOf<Int, Boolean>()
     private val dragLastPosMap = mutableMapOf<Int, Pair<Float, Float>>()
     private val draggingMap = mutableMapOf<Int, Boolean>()
+
+    private val draggingCallback = mutableMapOf<Int, ((String) -> Unit)>()
+    private val clickCallback = mutableMapOf<Int, ((MotionEvent) -> Unit )>()
 
     private var floatingIds: Int = 0
 
@@ -120,25 +124,34 @@ class FloatingService : Service() {
         }
         windowManager.addView(view, finalParams)
         floatings[id] = view
-        draggableMap[id] = true
-        setupDragListener(id, view)
+//        draggableMap[id] = true
+//        setupDragListener(id)
         return id
     }
 
     /**
      * 为悬浮窗设置拖动监听
      */
-    private fun setupDragListener(id: Int, view: View) {
+    private fun setupTouchListener(id: Int) {
+        val view = floatings[id] ?: return
+        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
+        val touchTime = 500;
+        var now: Long = 0
+
         view.setOnTouchListener(fun(_: View, event: MotionEvent): Boolean {
             if (draggableMap[id] != true) return false
 
             val layoutParams = view.layoutParams as? WindowManager.LayoutParams
                 ?: return false
 
+
             return when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
+
                     dragLastPosMap[id] = Pair(event.rawX, event.rawY)
-                    draggingMap[id] = true
+                    draggingMap[id] = false
+//                    cb?.invoke("start")
+                    now = System.currentTimeMillis()
                     true
                 }
 
@@ -146,23 +159,47 @@ class FloatingService : Service() {
                     val lastPos = dragLastPosMap[id] ?: return true
                     val dx = event.rawX - lastPos.first
                     val dy = event.rawY - lastPos.second
-                    dragLastPosMap[id] = Pair(event.rawX, event.rawY)
-                    layoutParams.x += dx.toInt()
-                    layoutParams.y += dy.toInt()
-                    update(id, layoutParams)
+                    var dis = sqrt(dx * dx + dy * dy)
+                    // 只有距离和时间都小于某个值才看作拖动
+                    if (dis >= touchSlop || System.currentTimeMillis() - now >= touchTime) {
+                        draggingMap[id] = true
+                        dragLastPosMap[id] = Pair(event.rawX, event.rawY)
+                        layoutParams.x += dx.toInt()
+                        layoutParams.y += dy.toInt()
+                        update(id, layoutParams)
+                        val cb = draggingCallback[id]
+                        cb?.invoke("dragging")
+                    }
                     true
                 }
 
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    draggingMap[id]?.let {
+                        if (!it) {
+                            val cb = clickCallback[id]
+                            cb?.invoke(event)
+                        } else {
+                            dragLastPosMap.remove(id)
+                            update(id, layoutParams)
+                            val cb = draggingCallback[id]
+                            cb?.invoke("end")
+                        }
+                    }
                     draggingMap[id] = false
-                    dragLastPosMap.remove(id)
-                    update(id, layoutParams)
                     true
                 }
 
                 else -> false
             }
         })
+    }
+
+    fun onDrag(id: Int, cb: ((String) -> Unit)) {
+        draggingCallback[id] = cb
+    }
+
+    fun onClick(id: Int, cb: ((MotionEvent) -> Unit)) {
+        clickCallback[id] = cb
     }
 
     // 监听旋转事件, 将所有悬浮窗x, y互换
@@ -182,10 +219,16 @@ class FloatingService : Service() {
     /**
      * 设置悬浮窗是否可拖动
      * @param id 悬浮窗编号
-     * @param draggable true 可拖动, false 不可拖动
+     * @param draggable true 可拖动(设置OnTouchListener), false 不可拖动(移除OnTouchListener)
      */
     fun setDraggable(id: Int, draggable: Boolean) {
         draggableMap[id] = draggable
+        val view = floatings[id] ?: return
+        if (draggable) {
+            setupTouchListener(id)
+        } else {
+            view.setOnTouchListener(null)
+        }
     }
 
     fun isDragging(id: Int): Boolean {
@@ -270,6 +313,8 @@ class FloatingService : Service() {
         draggableMap.remove(id)
         dragLastPosMap.remove(id)
         draggingMap.remove(id)
+        draggingCallback.remove(id)
+        clickCallback.remove(id)
     }
 
     override fun onDestroy() {
@@ -281,6 +326,8 @@ class FloatingService : Service() {
         draggableMap.clear()
         dragLastPosMap.clear()
         draggingMap.clear()
+        draggingCallback.clear()
+        clickCallback.clear()
         super.onDestroy()
     }
 }

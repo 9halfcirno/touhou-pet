@@ -1,10 +1,8 @@
 package com.cirno9half.touhoupet
 
-import android.content.Context
 import android.util.Log
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.binding.define
-import com.dokar.quickjs.binding.function
 
 class PetAPI(private val pet: Pet) {
     // 获取信息
@@ -26,7 +24,9 @@ class PetAPI(private val pet: Pet) {
             function("debug") { args -> Log.d("JS-${pet.info.id}", args.joinToString(" ")) }
         }
 
+        // 注入临时API对象, 后续从全局删除
         quickjs.define("___tmpAPI") {
+            // 设备相关
             function("device_getWidth") {
                 val ctx = pet.context ?: return@function 0
                 ctx.resources.displayMetrics.widthPixels
@@ -36,16 +36,19 @@ class PetAPI(private val pet: Pet) {
                 ctx.resources.displayMetrics.heightPixels
             }
 
+            // pet动画相关
             function("animation_switchTo") { args -> pet.animation.switchTo(args[0] as String) }
             function("animation_pause") { pet.animation.paused = true }
             function("animation_resume") { pet.animation.paused = false }
 //            asyncFunction("action_switchTo") { args -> pet.action.switchTo(args[0] as String) }
 
+            // pet信息相关
             function("getName") { getName() }
             function("getId") { pet.info.id }
             function("getDesc") { getDesc() }
 //            function("getPath") { getPetPath() }
 
+            // pet位置相关
             function("getX") { pet.floatingParams.x }
             function("setX") { args ->
                 pet.floatingParams.x = (args[0] as Number).toInt()
@@ -61,10 +64,13 @@ class PetAPI(private val pet: Pet) {
                 pet.floatingParams.y = (args[1] as Number).toInt()
                 pet.floatingParamsDirty = true
             }
+
+            // pet状态
             function("state_getDragging") {
                 return@function pet.isDragging()
             }
 
+            // pet视图相关
             function("view_getAlpha") {
                 return@function pet.floatingParams.alpha
             }
@@ -85,6 +91,25 @@ class PetAPI(private val pet: Pet) {
                 pet.inMain { pet.view.scaleY = (args[0] as Number).toFloat() }
             }
 
+            // pet对话框相关
+            function("dialog_show") { pet.component.dialog.show() }
+            function("dialog_set") { args ->
+                pet.component.dialog.content = args[0].toString()
+                return@function pet.component.dialog.length
+            }
+            function("dialog_append") { args ->
+                pet.component.dialog.appendContent(args[0].toString())
+                return@function pet.component.dialog.length
+            }
+            function("dialog_clear") { pet.component.dialog.clearContent() }
+            function("dialog_hidden") { pet.component.dialog.hidden() }
+
+            function("dialog_getContent") { pet.component.dialog.content }
+            function("dialog_setContent") { args ->
+                pet.component.dialog.content = args[0].toString()
+            }
+
+            // pet数据相关
             function("data_set") { args ->
                 val k = args[0]
                 if (k !is String) return@function false // 设置失败返回false
@@ -109,6 +134,7 @@ class PetAPI(private val pet: Pet) {
                 return@function pet.data.delete(k)
             }
 
+            // pet传感器相关
             function("sensor_touchEdge") {
                 val ctx = pet.context ?: return@function "none"
                 val dm = ctx.resources.displayMetrics
@@ -124,29 +150,31 @@ class PetAPI(private val pet: Pet) {
                 // 本地坐标系, 与 FloatingService.fixPos 一致:
                 //   竖屏: y下边界 = screenH - navH - statusH
                 //   横屏: y下边界 = screenH - statusH (导航栏在侧边)
-                val isLandscape = ctx.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                val isLandscape =
+                    ctx.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
                 val bottomBoundary = if (isLandscape) {
                     dm.heightPixels
                 } else {
                     dm.heightPixels - statusH - navH
                 }
 
-                val atLeft   = px <= 5
-                val atRight  = px + viewW >= screenW - 5
-                val atTop    = py <= 5
+                val atLeft = px <= 5
+                val atRight = px + viewW >= screenW - 5
+                val atTop = py <= 5
                 val atBottom = py + viewH >= bottomBoundary - 5
 
                 val edges = buildString {
-                    if (atTop)    append("top-")
+                    if (atTop) append("top-")
                     if (atBottom) append("bottom-")
-                    if (atLeft)   append("left-")
-                    if (atRight)  append("right-")
+                    if (atLeft) append("left-")
+                    if (atRight) append("right-")
                 }
                 return@function edges.removeSuffix("-").ifEmpty { "none" }
             }
 
         }
-        quickjs.evaluate<Any?>("""
+        quickjs.evaluate<Any?>(
+            """
             (function(bridge) {
                 globalThis.Pet = globalThis.Pet ?? {};
                 
@@ -194,7 +222,7 @@ class PetAPI(private val pet: Pet) {
                         }
                     },
                     action: {
-                        async switchTo(id) {
+                        async switchTo(id) { // 这个代替kt侧pet.action.switchTo, 避免死锁
                             let __petCtx = globalThis.Pet[petId];
                             let __actionMap = globalThis.Action[petId];
                             let __oldAction = __actionMap?.[__petCtx.currentAction];
@@ -211,6 +239,17 @@ class PetAPI(private val pet: Pet) {
                     },
                     state: {
                         get dragging() { return bridge.state_getDragging() }
+                    },
+                    
+                    dialog: {
+                        get content() { return bridge.dialog_getContent },
+                        set content(str) { if (typeof str === "string") return bridge.dialog_setContent(str) },
+                        
+                        show() { bridge.dialog_show() },
+                        hidden() { bridge.dialog_hidden() },
+                        append(str) { if (typeof str === "string") return bridge.dialog_append(str); },
+                        set(str) { if (typeof str === "string") return bridge.dialog_set(str) },
+                        clear() { bridge.dialog_clear(); }
                     },
                     
                     view: {
